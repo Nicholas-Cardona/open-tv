@@ -17,7 +17,8 @@ const ARG_CACHE: &str = "--cache=";
 const ARG_NO: &str = "no";
 const ARG_RECORD: &str = "--stream-record=";
 const ARG_TITLE: &str = "--title=";
-const ARG_MSG_LEVEL: &str = "--msg-level=all=error";
+// const ARG_MSG_LEVEL: &str = "--msg-level=all=info";
+ const ARG_MSG_LEVEL: &str = "--quiet";
 const ARG_YTDLP_PATH: &str = "--script-opts=ytdl_hook-ytdl_path=";
 const ARG_VOLUME: &str = "--volume=";
 const ARG_HTTP_HEADERS: &str = "--http-header-fields=";
@@ -45,6 +46,17 @@ pub async fn play(channel: Channel, record: bool, record_path: Option<String>) -
         .spawn()?;
 
     let status = cmd.wait().await?;
+
+    if let Some(stdout) = cmd.stdout.take() {
+        let mut lines = BufReader::new(stdout).lines();
+        while let Some(line) = lines.next_line().await? {
+            if line.contains("Exiting at:") {
+                if let Some((_, time)) = line.split_once("Exiting at: ") {
+                    println!("The time is {}", time);
+                }
+            }
+        }
+    }
     if !status.success() {
         let stdout = cmd.stdout.take();
         if let Some(stdout) = stdout {
@@ -78,6 +90,8 @@ fn get_play_args(
     let settings = get_settings()?;
     let headers = sql::get_channel_headers_by_id(channel.id.context("no channel id?")?)?;
     args.push(channel.url.context("no url")?);
+    args.push("--term-playing-msg=Exiting at: ${time-pos}s".to_string());
+
     if channel.media_type != media_type::LIVESTREAM {
         args.push(ARG_SAVE_POSITION_ON_QUIT.to_string());
     }
