@@ -1,12 +1,15 @@
 .channel {
   border-radius: 0.25rem;
-  height: 3em;
   width: 100%;
+  height: 100%;
   background: #343a40;
   overflow-y: hidden;
   overflow-x: hidden;
   user-select: none;
   transition: width 0.5s ease-out;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
 }
 
 .channel-title {
@@ -16,11 +19,14 @@
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+  flex-grow: 1;
 }
 
 .channel-image {
-  max-width: 50px;
-  max-height: 2em;
+  max-width: 20em;
+  max-height: 25em;
+  height: 100%;
+  padding-top: 1em;
 }
 
 .channel:hover {
