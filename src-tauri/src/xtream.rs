@@ -248,6 +248,7 @@ fn convert_xtream_live_to_channel(
         group_id: None,
         series_id: None,
         tv_archive: get_serde_json_number(&stream.tv_archive).map(|x| x == 1),
+        watch_percentage: Some(0),
     })
 }
 
@@ -347,6 +348,7 @@ fn episode_to_channel(episode: XtreamEpisode, source: &Source, series_id: u64) -
         group_id: None,
         favorite: false,
         tv_archive: None,
+        watch_percentage: Some(0),
     })
 }
 

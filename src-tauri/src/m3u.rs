@@ -271,6 +271,7 @@ fn get_channel_from_lines(
         favorite: false,
         stream_id: None,
         tv_archive: None,
+        watch_percentage: None,
     };
     Ok(channel)
 }

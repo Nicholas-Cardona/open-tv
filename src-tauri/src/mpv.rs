@@ -18,7 +18,7 @@ const ARG_NO: &str = "no";
 const ARG_RECORD: &str = "--stream-record=";
 const ARG_TITLE: &str = "--title=";
 // const ARG_MSG_LEVEL: &str = "--msg-level=all=info";
- const ARG_MSG_LEVEL: &str = "--quiet";
+const ARG_MSG_LEVEL: &str = "--quiet";
 const ARG_YTDLP_PATH: &str = "--script-opts=ytdl_hook-ytdl_path=";
 const ARG_VOLUME: &str = "--volume=";
 const ARG_HTTP_HEADERS: &str = "--http-header-fields=";
@@ -38,7 +38,7 @@ static YTDLP_PATH: LazyLock<String> = LazyLock::new(|| find_macos_bin(YTDLP_BIN_
 
 pub async fn play(channel: Channel, record: bool, record_path: Option<String>) -> Result<()> {
     println!("{} playing", channel.url.as_ref().unwrap());
-    let args = get_play_args(channel, record, record_path)?;
+    let args = get_play_args(channel.clone(), record, record_path)?;
     println!("with args: {:?}", args);
     let mut cmd = Command::new(MPV_PATH.clone())
         .args(args)
@@ -49,10 +49,13 @@ pub async fn play(channel: Channel, record: bool, record_path: Option<String>) -
 
     if let Some(stdout) = cmd.stdout.take() {
         let mut lines = BufReader::new(stdout).lines();
+
+        let exited_at = 0;
+        let duration = 0;
         while let Some(line) = lines.next_line().await? {
             if line.contains("Exiting at:") {
                 if let Some((_, time)) = line.split_once("Exiting at: ") {
-                    println!("The time is {}", time);
+                    update_percentage_watched(channel.clone(), 10);
                 }
             }
         }
@@ -90,7 +93,7 @@ fn get_play_args(
     let settings = get_settings()?;
     let headers = sql::get_channel_headers_by_id(channel.id.context("no channel id?")?)?;
     args.push(channel.url.context("no url")?);
-    args.push("--term-playing-msg=Exiting at: ${time-pos}s".to_string());
+    args.push("--term-playing-msg=Exiting at: ${time-pos}s\nDuration: ${duration}".to_string());
 
     if channel.media_type != media_type::LIVESTREAM {
         args.push(ARG_SAVE_POSITION_ON_QUIT.to_string());
@@ -135,6 +138,17 @@ fn get_play_args(
         args.append(&mut params);
     }
     Ok(args)
+}
+
+fn update_percentage_watched(channel: Channel, percentage: i32) -> Result<()> {
+    if let Some(id) = channel.id {
+        if (channel.media_type == media_type::MOVIE || channel.media_type == media_type::SERIE) {
+            let result = sql::update_watch_percentage(id, percentage);
+            result.unwrap()
+        }
+    }
+
+    return Ok(());
 }
 
 fn set_headers(headers: Option<ChannelHttpHeaders>, args: &mut Vec<String>) {

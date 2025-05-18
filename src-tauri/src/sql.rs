@@ -65,6 +65,7 @@ CREATE TABLE "channels" (
   "favorite" integer,
   "series_id" integer,
   "group_id" integer,
+  "watch_percentage" integer DEFAULT 0,
   FOREIGN KEY (source_id) REFERENCES sources(id)
   FOREIGN KEY (group_id) REFERENCES groups(id)
 );
@@ -184,6 +185,11 @@ fn apply_migrations() -> Result<()> {
               ALTER TABLE channels ADD COLUMN tv_archive integer;
               CREATE INDEX index_channels_tv_archive on channels(tv_archive);
             "#,
+        ),
+        M::up(
+            r#"
+            ALTER TABLE channels ADD COLUMN watch_percentage integer;
+          "#,
         ),
     ]);
     migrations.to_latest(&mut sql)?;
@@ -366,6 +372,19 @@ pub fn update_settings(map: HashMap<String, String>) -> Result<()> {
     Ok(())
 }
 
+pub fn update_watch_percentage(id: i64, percentage: i32) -> Result<()> {
+    let sql = get_conn()?;
+    sql.execute(
+        r#"
+    UPDATE channels
+    SET watch_percentage = ?
+    WHERE id = ?
+    "#,
+        params![percentage, id],
+    )?;
+    return Ok(());
+}
+
 pub fn search(filters: Filters) -> Result<Vec<Channel>> {
     if filters.view_type == view_type::CATEGORIES
         && filters.group_id.is_none()
@@ -540,6 +559,7 @@ fn row_to_group(row: &Row) -> std::result::Result<Channel, rusqlite::Error> {
         source_id: row.get("source_id")?,
         stream_id: None,
         tv_archive: None,
+        watch_percentage: None,
     };
     Ok(channel)
 }
@@ -558,6 +578,7 @@ fn row_to_channel(row: &Row) -> std::result::Result<Channel, rusqlite::Error> {
         group: None,
         stream_id: row.get("stream_id")?,
         tv_archive: row.get("tv_archive")?,
+        watch_percentage: row.get("watch_percentage")?,
     };
     Ok(channel)
 }
@@ -999,6 +1020,7 @@ fn row_to_custom_channel(row: &Row) -> Result<CustomChannel, rusqlite::Error> {
             source_id: None,
             stream_id: None,
             tv_archive: None,
+            watch_percentage: row.get("watch_percentage")?,
         },
         headers: Some(ChannelHttpHeaders {
             http_origin: row.get("http_origin")?,
