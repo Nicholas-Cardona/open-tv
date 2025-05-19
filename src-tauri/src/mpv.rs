@@ -50,16 +50,34 @@ pub async fn play(channel: Channel, record: bool, record_path: Option<String>) -
     if let Some(stdout) = cmd.stdout.take() {
         let mut lines = BufReader::new(stdout).lines();
 
-        let exited_at = 0;
-        let duration = 0;
+        let mut exited_at = 0;
+        let mut duration = 0;
         while let Some(line) = lines.next_line().await? {
             if line.contains("Exiting at:") {
                 if let Some((_, time)) = line.split_once("Exiting at: ") {
-                    update_percentage_watched(channel.clone(), 10);
+                    if let Some(sec) = parse_duration_string(time.to_string()) {
+                        exited_at = sec;
+                        println!("Exit Time in seconds {}", sec);
+                    }
+                }
+            }
+
+            if line.contains("Duration: ") {
+                if let Some((_, time)) = line.split_once("Duration: ") {
+                    if let Some(sec) = parse_duration_string(time.to_string()) {
+                        duration = sec;
+                        println!("Duration string {}", sec);
+                    }
                 }
             }
         }
+        if exited_at != 0 && duration != 0 {
+            let percentage_watched = (exited_at as f64 / duration as f64) * 100.0;
+            let rounded_percentage = percentage_watched.floor() as i32;
+            let _ = update_percentage_watched(channel, rounded_percentage);
+        }
     }
+
     if !status.success() {
         let stdout = cmd.stdout.take();
         if let Some(stdout) = stdout {
@@ -93,7 +111,7 @@ fn get_play_args(
     let settings = get_settings()?;
     let headers = sql::get_channel_headers_by_id(channel.id.context("no channel id?")?)?;
     args.push(channel.url.context("no url")?);
-    args.push("--term-playing-msg=Exiting at: ${time-pos}s\nDuration: ${duration}".to_string());
+    args.push("--term-playing-msg=Exiting at: ${time-pos}\nDuration: ${duration}".to_string());
 
     if channel.media_type != media_type::LIVESTREAM {
         args.push(ARG_SAVE_POSITION_ON_QUIT.to_string());
@@ -142,13 +160,26 @@ fn get_play_args(
 
 fn update_percentage_watched(channel: Channel, percentage: i32) -> Result<()> {
     if let Some(id) = channel.id {
-        if (channel.media_type == media_type::MOVIE || channel.media_type == media_type::SERIE) {
+        if channel.media_type == media_type::MOVIE || channel.media_type == media_type::SERIE {
             let result = sql::update_watch_percentage(id, percentage);
             result.unwrap()
         }
     }
 
     return Ok(());
+}
+
+fn parse_duration_string(duration: String) -> Option<u32> {
+    let parts: Vec<&str> = duration.split(':').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+
+    let hours: u32 = parts[0].parse().ok()?;
+    let minutes: u32 = parts[1].parse().ok()?;
+    let seconds: u32 = parts[2].parse().ok()?;
+
+    Some(hours * 3600 + minutes * 60 + seconds)
 }
 
 fn set_headers(headers: Option<ChannelHttpHeaders>, args: &mut Vec<String>) {
